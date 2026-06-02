@@ -8,6 +8,12 @@ SECRET_KEY = config('SECRET_KEY', default='insecure-dev-key-change-in-production
 DEBUG = config('DEBUG', default=False, cast=bool)
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
 
+import os
+RAILWAY_PUBLIC_DOMAIN = os.environ.get('RAILWAY_PUBLIC_DOMAIN')
+if RAILWAY_PUBLIC_DOMAIN:
+    ALLOWED_HOSTS.append(RAILWAY_PUBLIC_DOMAIN)
+ALLOWED_HOSTS.append('healthcheck.railway.app')
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
