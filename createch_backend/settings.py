@@ -109,4 +109,7 @@ MPESA_PASSKEY = config('MPESA_PASSKEY', default='')
 MPESA_BUSINESS_SHORT_CODE = config('MPESA_BUSINESS_SHORT_CODE', default='174379')
 MPESA_TILL_NUMBER = config('MPESA_TILL_NUMBER', default='174379')
 MPESA_ENVIRONMENT = config('MPESA_ENVIRONMENT', default='sandbox')
-MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='https://example.com/api/mpesa/callback/')
+MPESA_CALLBACK_URL = config(
+    'MPESA_CALLBACK_URL',
+    default=f'https://{RAILWAY_PUBLIC_DOMAIN}/api/mpesa/callback/' if RAILWAY_PUBLIC_DOMAIN else 'https://example.com/api/mpesa/callback/',
+)
