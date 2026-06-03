@@ -32,6 +32,34 @@ def _password_and_timestamp() -> tuple[str, str]:
     return password, timestamp
 
 
+def query_stk_push(checkout_request_id: str) -> dict:
+    """Query the status of a pending STK Push transaction."""
+    token              = get_access_token()
+    password, timestamp = _password_and_timestamp()
+
+    payload = {
+        "BusinessShortCode": settings.MPESA_BUSINESS_SHORT_CODE,
+        "Password":          password,
+        "Timestamp":         timestamp,
+        "CheckoutRequestID": checkout_request_id,
+    }
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type":  "application/json",
+    }
+
+    resp = requests.post(
+        f"{_base_url()}/mpesa/stkpushquery/v1/query",
+        json=payload,
+        headers=headers,
+        timeout=30,
+    )
+    logger.info("Daraja STK query response [%s]: %s", resp.status_code, resp.text)
+    resp.raise_for_status()
+    return resp.json()
+
+
 def initiate_stk_push(phone_number: str, amount: int, order_id, description: str) -> dict:
     """
     Send a CustomerBuyGoodsOnline STK Push.
