@@ -15,12 +15,11 @@ def _base_url() -> str:
 
 
 def get_access_token() -> str:
+    key    = settings.MPESA_CONSUMER_KEY.strip()
+    secret = settings.MPESA_CONSUMER_SECRET.strip()
+    logger.error("Daraja auth attempt — key_len=%d secret_len=%d env=%s", len(key), len(secret), settings.MPESA_ENVIRONMENT)
     url = f"{_base_url()}/oauth/v1/generate?grant_type=client_credentials"
-    resp = requests.get(
-        url,
-        auth=(settings.MPESA_CONSUMER_KEY, settings.MPESA_CONSUMER_SECRET),
-        timeout=15,
-    )
+    resp = requests.get(url, auth=(key, secret), timeout=15)
     if not resp.ok:
         logger.error("Daraja auth failed [%s]: %s", resp.status_code, resp.text)
         resp.raise_for_status()
