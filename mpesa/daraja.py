@@ -21,7 +21,9 @@ def get_access_token() -> str:
         auth=(settings.MPESA_CONSUMER_KEY, settings.MPESA_CONSUMER_SECRET),
         timeout=15,
     )
-    resp.raise_for_status()
+    if not resp.ok:
+        logger.error("Daraja auth failed [%s]: %s", resp.status_code, resp.text)
+        resp.raise_for_status()
     return resp.json()['access_token']
 
 
@@ -55,7 +57,7 @@ def query_stk_push(checkout_request_id: str) -> dict:
         headers=headers,
         timeout=30,
     )
-    logger.info("Daraja STK query response [%s]: %s", resp.status_code, resp.text)
+    logger.error("Daraja STK query response [%s]: %s", resp.status_code, resp.text)
     resp.raise_for_status()
     return resp.json()
 
@@ -98,6 +100,6 @@ def initiate_stk_push(phone_number: str, amount: int, order_id, description: str
         headers=headers,
         timeout=30,
     )
-    logger.info("Daraja STK response [%s]: %s", resp.status_code, resp.text)
+    logger.error("Daraja STK push response [%s]: %s", resp.status_code, resp.text)
     resp.raise_for_status()
     return resp.json()
