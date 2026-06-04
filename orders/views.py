@@ -1,4 +1,6 @@
 import logging
+from django.core.paginator import Paginator
+from django.db.models import Q
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -18,7 +20,37 @@ def normalize_phone(raw: str) -> str:
     return phone
 
 
-class OrderCreateView(APIView):
+class OrderView(APIView):
+    PAGE_SIZE = 20
+
+    def get(self, request):
+        key = request.headers.get('X-Admin-Key', '')
+        if not settings.ADMIN_SECRET_KEY or key != settings.ADMIN_SECRET_KEY:
+            return Response({'error': 'Unauthorised.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        qs = Order.objects.prefetch_related('items').all()
+
+        status_filter = request.query_params.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+
+        search = request.query_params.get('search', '').strip()
+        if search:
+            qs = qs.filter(
+                Q(mpesa_receipt_number__icontains=search) |
+                Q(customer_phone__icontains=search) |
+                Q(customer_name__icontains=search)
+            )
+
+        paginator   = Paginator(qs, self.PAGE_SIZE)
+        page_number = request.query_params.get('page', 1)
+        page        = paginator.get_page(page_number)
+
+        return Response({
+            'count':   paginator.count,
+            'results': OrderSerializer(page.object_list, many=True).data,
+        })
+
     def post(self, request):
         serializer = OrderCreateSerializer(data=request.data)
         if not serializer.is_valid():
@@ -81,13 +113,3 @@ class OrderDetailView(APIView):
         except (Order.DoesNotExist, ValueError):
             return Response({'error': 'Order not found.'}, status=status.HTTP_404_NOT_FOUND)
         return Response(OrderSerializer(order).data)
-
-
-class OrderListView(APIView):
-    """Protected admin endpoint — requires X-API-Key header."""
-    def get(self, request):
-        key = request.headers.get('X-API-Key', '')
-        if not settings.ADMIN_API_KEY or key != settings.ADMIN_API_KEY:
-            return Response({'error': 'Unauthorised.'}, status=status.HTTP_401_UNAUTHORIZED)
-        orders = Order.objects.prefetch_related('items').all()[:200]
-        return Response(OrderSerializer(orders, many=True).data)
