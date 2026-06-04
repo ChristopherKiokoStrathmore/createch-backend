@@ -41,7 +41,7 @@ class OrderCreateView(APIView):
         try:
             result = initiate_stk_push(
                 phone_number = phone,
-                amount       = 1,  # TODO: restore to int(total) before go-live
+                amount       = int(total),
                 order_id     = order.id,
                 description  = "Createch Kit",
             )
