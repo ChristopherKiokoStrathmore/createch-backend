@@ -36,13 +36,13 @@ class MpesaCallbackView(APIView):
                 order.status               = Order.PAID
                 order.mpesa_receipt_number = receipt
                 order.save(update_fields=['status', 'mpesa_receipt_number'])
-                logger.info("Order %s paid — receipt %s", order.id, receipt)
+                logger.error("CALLBACK: Order %s PAID — receipt %s", order.id, receipt)
             else:
                 reason = stk.get('ResultDesc', 'Payment declined.')
                 order.status               = Order.FAILED
                 order.mpesa_failure_reason = reason
                 order.save(update_fields=['status', 'mpesa_failure_reason'])
-                logger.info("Order %s failed — %s", order.id, reason)
+                logger.error("CALLBACK: Order %s FAILED — %s", order.id, reason)
 
         except Exception as exc:
             logger.error("Callback processing error: %s", exc, exc_info=True)
@@ -79,14 +79,18 @@ class PaymentStatusView(APIView):
                 if result_code in (0, '0'):
                     order.status = Order.PAID
                     order.save(update_fields=['status'])
-                    logger.info("Order %s marked paid via STK query", order.id)
+                    logger.error("STK QUERY: Order %s marked PAID", order.id)
                 elif result_code is not None and str(result_code) not in ('', 'None'):
                     order.status               = Order.FAILED
                     order.mpesa_failure_reason = result.get('ResultDesc', 'Payment failed.')
                     order.save(update_fields=['status', 'mpesa_failure_reason'])
-                    logger.info("Order %s marked failed via STK query — %s", order.id, order.mpesa_failure_reason)
+                    logger.error("STK QUERY: Order %s marked FAILED — %s", order.id, order.mpesa_failure_reason)
             except Exception as exc:
-                logger.warning("STK query failed for order %s: %s", order.id, exc)
+                error_body = getattr(getattr(exc, 'response', None), 'text', '')
+                if 'processing limit' in error_body:
+                    logger.error("STK QUERY: Order %s still processing — will retry on next poll", order.id)
+                else:
+                    logger.error("STK QUERY: Order %s query error — %s", order.id, exc)
 
         return Response({
             'order_id':       str(order.id),
