@@ -90,7 +90,8 @@ CORS_ALLOWED_ORIGINS = config(
 ).split(',')
 CORS_ALLOW_HEADERS = [
     'accept', 'accept-encoding', 'authorization', 'content-type',
-    'dnt', 'origin', 'user-agent', 'x-csrftoken', 'x-requested-with', 'x-api-key',
+    'dnt', 'origin', 'user-agent', 'x-csrftoken', 'x-requested-with',
+    'x-api-key', 'x-admin-key',
 ]
 
 # DRF
@@ -99,8 +100,10 @@ REST_FRAMEWORK = {
     'DEFAULT_PARSER_CLASSES': ['rest_framework.parsers.JSONParser'],
 }
 
-# Admin order API key
+# Admin order API key (legacy — kept for backwards compat)
 ADMIN_API_KEY = config('ADMIN_API_KEY', default='')
+# Admin dashboard secret key — used by X-Admin-Key header on GET /api/orders/
+ADMIN_SECRET_KEY = config('ADMIN_SECRET_KEY', default='')
 
 # M-Pesa Daraja
 MPESA_CONSUMER_KEY = config('MPESA_CONSUMER_KEY', default='')
