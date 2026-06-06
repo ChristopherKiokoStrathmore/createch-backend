@@ -21,18 +21,34 @@ class Order(models.Model):
         (CANCELLED,  'Cancelled'),
     ]
 
-    id                       = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    customer_name            = models.CharField(max_length=200)
-    customer_phone           = models.CharField(max_length=20)
-    delivery_address         = models.TextField()
-    status                   = models.CharField(max_length=20, choices=STATUS_CHOICES, default=PENDING)
-    total_amount             = models.DecimalField(max_digits=10, decimal_places=2)
+    MPESA  = 'mpesa'
+    AIRTEL = 'airtel'
+    CARD   = 'card'
+
+    PAYMENT_METHOD_CHOICES = [
+        (MPESA,  'M-Pesa'),
+        (AIRTEL, 'Airtel Money'),
+        (CARD,   'Card'),
+    ]
+
+    id                        = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    customer_name             = models.CharField(max_length=200)
+    customer_phone            = models.CharField(max_length=20)
+    delivery_address          = models.TextField()
+    status                    = models.CharField(max_length=20, choices=STATUS_CHOICES, default=PENDING)
+    total_amount              = models.DecimalField(max_digits=10, decimal_places=2)
+    payment_method            = models.CharField(max_length=10, choices=PAYMENT_METHOD_CHOICES, default=MPESA)
+    # Legacy M-Pesa Daraja fields (kept for historical orders)
     mpesa_checkout_request_id = models.CharField(max_length=200, blank=True)
     mpesa_merchant_request_id = models.CharField(max_length=200, blank=True)
-    mpesa_receipt_number     = models.CharField(max_length=100, blank=True)
-    mpesa_failure_reason     = models.CharField(max_length=500, blank=True)
-    created_at               = models.DateTimeField(auto_now_add=True)
-    updated_at               = models.DateTimeField(auto_now=True)
+    mpesa_receipt_number      = models.CharField(max_length=100, blank=True)
+    mpesa_failure_reason      = models.CharField(max_length=500, blank=True)
+    # IntaSend fields (M-Pesa, Airtel Money, Card)
+    intasend_invoice_id       = models.CharField(max_length=200, blank=True)
+    intasend_failure_reason   = models.CharField(max_length=500, blank=True)
+    card_checkout_url         = models.URLField(blank=True)
+    created_at                = models.DateTimeField(auto_now_add=True)
+    updated_at                = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['-created_at']

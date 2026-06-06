@@ -8,6 +8,7 @@ from django.conf import settings
 from .models import Order, OrderItem
 from .serializers import OrderCreateSerializer, OrderSerializer
 from mpesa.daraja import initiate_stk_push
+from intasend import payment as intasend
 
 logger = logging.getLogger(__name__)
 
@@ -61,15 +62,57 @@ class OrderView(APIView):
         total      = sum(i['quantity'] * i['unit_price'] for i in items_data)
         phone      = normalize_phone(data['customer_phone'])
 
+        payment_method = data.get('payment_method', Order.MPESA)
+
         order = Order.objects.create(
             customer_name    = data['customer_name'],
             customer_phone   = phone,
             delivery_address = data['delivery_address'],
             total_amount     = total,
+            payment_method   = payment_method,
         )
         for item in items_data:
             OrderItem.objects.create(order=order, **item)
 
+        # ── IntaSend payments (M-Pesa, Airtel Money, Card) ───────────────────
+        if settings.INTASEND_PUBLISHABLE_KEY and payment_method in (Order.MPESA, Order.AIRTEL, Order.CARD):
+            try:
+                if payment_method == Order.CARD:
+                    redirect_url = f"{settings.FRONTEND_URL}/order-confirmation?id={order.id}"
+                    result = intasend.initiate_card_checkout(int(total), order.id, redirect_url)
+                    checkout_url = result.get("url") or result.get("checkout_url", "")
+                    order.card_checkout_url = checkout_url
+                    order.save(update_fields=["card_checkout_url"])
+                    return Response({
+                        "order_id":     str(order.id),
+                        "checkout_url": checkout_url,
+                        "message":      "Redirecting to card payment.",
+                    }, status=status.HTTP_201_CREATED)
+
+                elif payment_method == Order.AIRTEL:
+                    result = intasend.initiate_airtel(phone, int(total), order.id)
+                else:
+                    result = intasend.initiate_mpesa(phone, int(total), order.id)
+
+                invoice = result.get("invoice", {})
+                order.intasend_invoice_id = invoice.get("invoice_id", "")
+                order.save(update_fields=["intasend_invoice_id"])
+                method_label = "M-Pesa" if payment_method == Order.MPESA else "Airtel Money"
+                return Response({
+                    "order_id": str(order.id),
+                    "message":  f"Check your phone for the {method_label} prompt.",
+                }, status=status.HTTP_201_CREATED)
+
+            except Exception as exc:
+                logger.error("IntaSend error for order %s: %s", order.id, exc)
+                order.status = Order.FAILED
+                order.save(update_fields=["status"])
+                return Response(
+                    {"error": "Payment service unavailable. Please try again."},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+
+        # ── Legacy M-Pesa Daraja (fallback when IntaSend not configured) ─────
         try:
             result = initiate_stk_push(
                 phone_number = phone,

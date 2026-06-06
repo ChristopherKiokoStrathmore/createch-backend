@@ -14,6 +14,7 @@ class OrderCreateSerializer(serializers.Serializer):
     customer_name    = serializers.CharField(max_length=200)
     customer_phone   = serializers.CharField(max_length=20)
     delivery_address = serializers.CharField()
+    payment_method   = serializers.ChoiceField(choices=['mpesa', 'airtel', 'card'], default='mpesa')
     items            = OrderItemInputSerializer(many=True)
 
     def validate_items(self, value):
@@ -48,6 +49,8 @@ class OrderSerializer(serializers.ModelSerializer):
         model  = Order
         fields = [
             'id', 'customer_name', 'customer_phone', 'delivery_address',
-            'status', 'total_amount', 'mpesa_receipt_number',
-            'mpesa_failure_reason', 'items', 'created_at', 'updated_at',
+            'status', 'total_amount', 'payment_method',
+            'mpesa_receipt_number', 'mpesa_failure_reason',
+            'intasend_invoice_id', 'intasend_failure_reason',
+            'card_checkout_url', 'items', 'created_at', 'updated_at',
         ]

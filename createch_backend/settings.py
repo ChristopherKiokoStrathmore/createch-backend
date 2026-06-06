@@ -25,6 +25,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'orders',
     'mpesa',
+    'intasend',
 ]
 
 MIDDLEWARE = [
@@ -105,14 +106,22 @@ ADMIN_API_KEY = config('ADMIN_API_KEY', default='')
 # Admin dashboard secret key — used by X-Admin-Key header on GET /api/orders/
 ADMIN_SECRET_KEY = config('ADMIN_SECRET_KEY', default='')
 
-# M-Pesa Daraja
-MPESA_CONSUMER_KEY = config('MPESA_CONSUMER_KEY', default='')
-MPESA_CONSUMER_SECRET = config('MPESA_CONSUMER_SECRET', default='')
-MPESA_PASSKEY = config('MPESA_PASSKEY', default='')
+# M-Pesa Daraja (legacy fallback)
+MPESA_CONSUMER_KEY        = config('MPESA_CONSUMER_KEY', default='')
+MPESA_CONSUMER_SECRET     = config('MPESA_CONSUMER_SECRET', default='')
+MPESA_PASSKEY             = config('MPESA_PASSKEY', default='')
 MPESA_BUSINESS_SHORT_CODE = config('MPESA_BUSINESS_SHORT_CODE', default='174379')
-MPESA_TILL_NUMBER = config('MPESA_TILL_NUMBER', default='174379')
-MPESA_ENVIRONMENT = config('MPESA_ENVIRONMENT', default='sandbox')
-MPESA_CALLBACK_URL = config(
+MPESA_TILL_NUMBER         = config('MPESA_TILL_NUMBER', default='174379')
+MPESA_ENVIRONMENT         = config('MPESA_ENVIRONMENT', default='sandbox')
+MPESA_CALLBACK_URL        = config(
     'MPESA_CALLBACK_URL',
     default=f'https://{RAILWAY_PUBLIC_DOMAIN}/api/mpesa/callback/' if RAILWAY_PUBLIC_DOMAIN else 'https://example.com/api/mpesa/callback/',
 )
+
+# IntaSend (M-Pesa, Airtel Money, Card)
+INTASEND_PUBLISHABLE_KEY = config('INTASEND_PUBLISHABLE_KEY', default='')
+INTASEND_SECRET_KEY      = config('INTASEND_SECRET_KEY', default='')
+INTASEND_TEST_MODE       = config('INTASEND_TEST_MODE', default=True, cast=bool)
+
+# Frontend URL (used to build card payment redirect URLs)
+FRONTEND_URL = config('FRONTEND_URL', default='https://createch-hobbies.co.ke')

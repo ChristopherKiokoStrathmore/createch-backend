@@ -3,7 +3,9 @@
     "allow": [
       "Bash(curl *)",
       "Bash(python *)",
-      "Bash(railway --version)"
+      "Bash(railway --version)",
+      "Bash(pip install *)",
+      "Bash(git push *)"
     ]
   }
 }
