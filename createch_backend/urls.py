@@ -10,5 +10,5 @@ urlpatterns = [
     path('api/health/', health),
     path('api/', include('orders.urls')),
     path('api/mpesa/', include('mpesa.urls')),
-    path('api/intasend/', include('intasend.urls')),
+    path('api/intasend/', include('intasend_app.urls')),
 ]

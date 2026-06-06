@@ -8,7 +8,7 @@ from django.conf import settings
 from .models import Order, OrderItem
 from .serializers import OrderCreateSerializer, OrderSerializer
 from mpesa.daraja import initiate_stk_push
-from intasend import payment as intasend
+from intasend_app import payment as intasend
 
 logger = logging.getLogger(__name__)
 

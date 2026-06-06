@@ -25,7 +25,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'orders',
     'mpesa',
-    'intasend',
+    'intasend_app',
 ]
 
 MIDDLEWARE = [
