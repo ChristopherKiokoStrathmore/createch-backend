@@ -9,6 +9,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/health/', health),
     path('api/', include('orders.urls')),
-    path('api/mpesa/', include('mpesa.urls')),
     path('api/intasend/', include('intasend_app.urls')),
 ]

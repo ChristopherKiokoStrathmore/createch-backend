@@ -7,7 +7,6 @@ from rest_framework import status
 from django.conf import settings
 from .models import Order, OrderItem
 from .serializers import OrderCreateSerializer, OrderSerializer
-from mpesa.daraja import initiate_stk_push
 from intasend_app import payment as intasend
 
 logger = logging.getLogger(__name__)
@@ -112,41 +111,15 @@ class OrderView(APIView):
                     status=status.HTTP_503_SERVICE_UNAVAILABLE,
                 )
 
-        # ── Legacy M-Pesa Daraja (fallback when IntaSend not configured) ─────
-        try:
-            result = initiate_stk_push(
-                phone_number = phone,
-                amount       = int(total),
-                order_id     = order.id,
-                description  = "Createch Kit",
-            )
-
-            if result.get('ResponseCode') == '0':
-                order.mpesa_checkout_request_id = result.get('CheckoutRequestID', '')
-                order.mpesa_merchant_request_id = result.get('MerchantRequestID', '')
-                order.save(update_fields=['mpesa_checkout_request_id', 'mpesa_merchant_request_id'])
-                return Response({
-                    'order_id':            str(order.id),
-                    'checkout_request_id': order.mpesa_checkout_request_id,
-                    'message':             'Check your phone for the M-Pesa prompt.',
-                }, status=status.HTTP_201_CREATED)
-
-            order.status = Order.FAILED
-            order.mpesa_failure_reason = result.get('errorMessage', 'STK push rejected.')
-            order.save(update_fields=['status', 'mpesa_failure_reason'])
-            return Response(
-                {'error': 'Could not send payment prompt. Please try again.'},
-                status=status.HTTP_502_BAD_GATEWAY,
-            )
-
-        except Exception as exc:
-            logger.error("STK push error for order %s: %s", order.id, exc)
-            order.status = Order.FAILED
-            order.save(update_fields=['status'])
-            return Response(
-                {'error': 'Payment service unavailable. Please try again.'},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
+        # M-Pesa STK push is handled by the WooCommerce gateway on WordPress;
+        # this backend only processes payments when IntaSend is configured.
+        logger.error("Order %s created but no payment provider is configured.", order.id)
+        order.status = Order.FAILED
+        order.save(update_fields=['status'])
+        return Response(
+            {'error': 'Payment service unavailable. Please try again.'},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
 
 
 class OrderDetailView(APIView):
