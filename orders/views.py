@@ -1,4 +1,5 @@
 import logging
+import uuid
 from django.core.paginator import Paginator
 from django.db.models import Q
 from rest_framework.views import APIView
@@ -7,9 +8,17 @@ from rest_framework import status
 from django.conf import settings
 from .models import Order, OrderItem
 from .serializers import OrderCreateSerializer, OrderSerializer
-from intasend_app import payment as intasend
+from .dpo import verify_token, DPOError, RESULT_NOT_PAID_YET
 
 logger = logging.getLogger(__name__)
+
+
+def _is_uuid(value: str) -> bool:
+    try:
+        uuid.UUID(value)
+        return True
+    except (ValueError, AttributeError, TypeError):
+        return False
 
 
 def normalize_phone(raw: str) -> str:
@@ -73,53 +82,12 @@ class OrderView(APIView):
         for item in items_data:
             OrderItem.objects.create(order=order, **item)
 
-        # ── IntaSend payments (M-Pesa, Airtel Money, Card) ───────────────────
-        if settings.INTASEND_PUBLISHABLE_KEY and payment_method in (Order.MPESA, Order.AIRTEL, Order.CARD):
-            try:
-                if payment_method == Order.CARD:
-                    redirect_url = f"{settings.FRONTEND_URL}/order-confirmation?id={order.id}"
-                    result = intasend.initiate_card_checkout(int(total), order.id, redirect_url)
-                    checkout_url = result.get("url") or result.get("checkout_url", "")
-                    order.card_checkout_url = checkout_url
-                    order.save(update_fields=["card_checkout_url"])
-                    return Response({
-                        "order_id":     str(order.id),
-                        "checkout_url": checkout_url,
-                        "message":      "Redirecting to card payment.",
-                    }, status=status.HTTP_201_CREATED)
-
-                elif payment_method == Order.AIRTEL:
-                    result = intasend.initiate_airtel(phone, int(total), order.id)
-                else:
-                    result = intasend.initiate_mpesa(phone, int(total), order.id)
-
-                invoice = result.get("invoice", {})
-                order.intasend_invoice_id = invoice.get("invoice_id", "")
-                order.save(update_fields=["intasend_invoice_id"])
-                method_label = "M-Pesa" if payment_method == Order.MPESA else "Airtel Money"
-                return Response({
-                    "order_id": str(order.id),
-                    "message":  f"Check your phone for the {method_label} prompt.",
-                }, status=status.HTTP_201_CREATED)
-
-            except Exception as exc:
-                logger.error("IntaSend error for order %s: %s", order.id, exc)
-                order.status = Order.FAILED
-                order.save(update_fields=["status"])
-                return Response(
-                    {"error": "Payment service unavailable. Please try again."},
-                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
-                )
-
-        # M-Pesa STK push is handled by the WooCommerce gateway on WordPress;
-        # this backend only processes payments when IntaSend is configured.
-        logger.error("Order %s created but no payment provider is configured.", order.id)
-        order.status = Order.FAILED
-        order.save(update_fields=['status'])
-        return Response(
-            {'error': 'Payment service unavailable. Please try again.'},
-            status=status.HTTP_503_SERVICE_UNAVAILABLE,
-        )
+        # Payments are handled entirely by WooCommerce (Daraja STK push for
+        # M-Pesa, DPO Pay for cards); this backend only records the order.
+        return Response({
+            "order_id": str(order.id),
+            "message":  "Order recorded.",
+        }, status=status.HTTP_201_CREATED)
 
 
 class OrderDetailView(APIView):
@@ -129,3 +97,42 @@ class OrderDetailView(APIView):
         except (Order.DoesNotExist, ValueError):
             return Response({'error': 'Order not found.'}, status=status.HTTP_404_NOT_FOUND)
         return Response(OrderSerializer(order).data)
+
+
+class PaymentStatusView(APIView):
+    """GET /api/payment/status/?token=<dpo-transaction-token>
+
+    Server-side verification of a DPO Pay transaction. The frontend return
+    page calls this instead of trusting the ``CCDapproval`` param in DPO's
+    redirect URL, which is not authenticated and can be forged.
+
+    Returns only what the return page needs to render — never card data or
+    customer PII from the DPO response.
+    """
+
+    def get(self, request):
+        token = request.query_params.get('token', '').strip()
+        if not _is_uuid(token):
+            return Response({'error': 'A valid token query parameter is required.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            info = verify_token(token)
+        except DPOError as exc:
+            logger.error("DPO verifyToken failed for %s: %s", token, exc)
+            return Response({'error': 'Could not verify payment. Please try again.'},
+                            status=status.HTTP_502_BAD_GATEWAY)
+
+        if info['paid']:
+            payment_status = 'paid'
+        elif info['result'] == RESULT_NOT_PAID_YET:
+            payment_status = 'pending'
+        else:
+            payment_status = 'failed'
+
+        return Response({
+            'paid':     info['paid'],
+            'status':   payment_status,
+            'amount':   info['amount'],
+            'currency': info['currency'],
+        })

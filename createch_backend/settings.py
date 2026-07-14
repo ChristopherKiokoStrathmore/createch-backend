@@ -24,7 +24,6 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'orders',
-    'intasend_app',
 ]
 
 MIDDLEWARE = [
@@ -105,10 +104,12 @@ ADMIN_API_KEY = config('ADMIN_API_KEY', default='')
 # Admin dashboard secret key — used by X-Admin-Key header on GET /api/orders/
 ADMIN_SECRET_KEY = config('ADMIN_SECRET_KEY', default='')
 
-# IntaSend (M-Pesa, Airtel Money, Card)
-INTASEND_PUBLISHABLE_KEY = config('INTASEND_PUBLISHABLE_KEY', default='')
-INTASEND_SECRET_KEY      = config('INTASEND_SECRET_KEY', default='')
-INTASEND_TEST_MODE       = config('INTASEND_TEST_MODE', default=True, cast=bool)
+# WooCommerce webhook secret — must match the Secret field on the Woo webhook
+# (WP admin → WooCommerce → Settings → Advanced → Webhooks)
+WOO_WEBHOOK_SECRET = config('WOO_WEBHOOK_SECRET', default='')
 
-# Frontend URL (used to build card payment redirect URLs)
-FRONTEND_URL = config('FRONTEND_URL', default='https://createch-hobbies.co.ke')
+# DPO Pay (3G Direct Pay) — card gateway. Used by orders/dpo.py to verify
+# transaction tokens server-side. Same API URL for test and live; the
+# company token determines which environment.
+DPO_COMPANY_TOKEN = config('DPO_COMPANY_TOKEN', default='')
+DPO_API_URL       = config('DPO_API_URL', default='https://secure.3gdirectpay.com/API/v6/')
