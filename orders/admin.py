@@ -21,11 +21,11 @@ class OrderItemInline(admin.TabularInline):
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display  = ('short_id', 'customer_name', 'customer_phone', 'total_fmt',
-                     'status_badge', 'mpesa_receipt_number', 'created_at')
-    list_filter   = ('status', 'created_at')
-    search_fields = ('customer_name', 'customer_phone', 'mpesa_receipt_number',
-                     'mpesa_checkout_request_id')
+    list_display  = ('short_id', 'woo_order_id', 'customer_name', 'customer_phone',
+                     'total_fmt', 'status_badge', 'payment_method', 'created_at')
+    list_filter   = ('status', 'payment_method', 'created_at')
+    search_fields = ('customer_name', 'customer_phone', 'customer_email',
+                     'woo_order_id', 'mpesa_receipt_number')
     readonly_fields = ('id', 'mpesa_checkout_request_id', 'mpesa_merchant_request_id',
                        'mpesa_receipt_number', 'mpesa_failure_reason', 'created_at', 'updated_at')
     inlines       = [OrderItemInline]
@@ -33,10 +33,13 @@ class OrderAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('Customer', {
-            'fields': ('customer_name', 'customer_phone', 'delivery_address')
+            'fields': ('customer_name', 'customer_phone', 'customer_email', 'delivery_address')
         }),
         ('Order', {
             'fields': ('id', 'status', 'total_amount', 'created_at', 'updated_at')
+        }),
+        ('WooCommerce', {
+            'fields': ('woo_order_id', 'woo_status', 'woo_payment_gateway'),
         }),
         ('M-Pesa', {
             'fields': ('mpesa_checkout_request_id', 'mpesa_merchant_request_id',

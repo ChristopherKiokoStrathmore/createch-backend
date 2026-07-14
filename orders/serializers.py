@@ -48,8 +48,9 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Order
         fields = [
-            'id', 'customer_name', 'customer_phone', 'delivery_address',
-            'status', 'total_amount', 'payment_method',
+            'id', 'customer_name', 'customer_phone', 'customer_email',
+            'delivery_address', 'status', 'total_amount', 'payment_method',
+            'woo_order_id', 'woo_status', 'woo_payment_gateway',
             'mpesa_receipt_number', 'mpesa_failure_reason',
             'intasend_invoice_id', 'intasend_failure_reason',
             'card_checkout_url', 'items', 'created_at', 'updated_at',
