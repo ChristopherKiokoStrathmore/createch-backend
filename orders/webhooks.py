@@ -36,6 +36,15 @@ def _payment_method_from_gateway(gateway: str) -> str:
     return Order.CARD
 
 
+def _meta_value(payload: dict, key: str) -> str:
+    """Pull a single value out of the Woo order payload's meta_data list."""
+    for item in payload.get('meta_data') or []:
+        if isinstance(item, dict) and item.get('key') == key:
+            value = item.get('value')
+            return str(value).strip() if value is not None else ''
+    return ''
+
+
 def _signature_valid(request) -> bool:
     """Woo signs each delivery: base64(HMAC-SHA256(secret, raw body))."""
     supplied = request.headers.get('X-WC-Webhook-Signature', '')
@@ -100,19 +109,31 @@ class WooWebhookView(APIView):
         ])) or 'N/A'
 
         woo_status = payload.get('status', '')
+        defaults = {
+            'customer_name':       name,
+            'customer_phone':      (billing.get('phone') or '').strip(),
+            'customer_email':      billing.get('email') or '',
+            'delivery_address':    address,
+            'total_amount':        payload.get('total') or 0,
+            'status':              WOO_STATUS_MAP.get(woo_status, Order.PENDING),
+            'woo_status':          woo_status,
+            'woo_payment_gateway': gateway,
+            'payment_method':      _payment_method_from_gateway(gateway),
+        }
+        # M-Pesa meta written by the wc-mpesa-stk-push plugin. Only set when
+        # present so a payload without the meta can't blank a stored value.
+        for field, meta_key in (
+            ('mpesa_receipt_number',      '_mpesa_receipt_number'),
+            ('mpesa_checkout_request_id', '_mpesa_checkout_request_id'),
+            ('mpesa_merchant_request_id', '_mpesa_merchant_request_id'),
+        ):
+            value = _meta_value(payload, meta_key)
+            if value:
+                defaults[field] = value
+
         order, _created = Order.objects.update_or_create(
             woo_order_id=payload['id'],
-            defaults={
-                'customer_name':       name,
-                'customer_phone':      (billing.get('phone') or '').strip(),
-                'customer_email':      billing.get('email') or '',
-                'delivery_address':    address,
-                'total_amount':        payload.get('total') or 0,
-                'status':              WOO_STATUS_MAP.get(woo_status, Order.PENDING),
-                'woo_status':          woo_status,
-                'woo_payment_gateway': gateway,
-                'payment_method':      _payment_method_from_gateway(gateway),
-            },
+            defaults=defaults,
         )
 
         order.items.all().delete()
