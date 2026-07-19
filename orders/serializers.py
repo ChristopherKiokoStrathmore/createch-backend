@@ -2,35 +2,6 @@ from rest_framework import serializers
 from .models import Order, OrderItem
 
 
-class OrderItemInputSerializer(serializers.Serializer):
-    product_id   = serializers.CharField(max_length=100)
-    product_name = serializers.CharField(max_length=200)
-    product_slug = serializers.CharField(max_length=200, required=False, default='')
-    quantity     = serializers.IntegerField(min_value=1, max_value=20)
-    unit_price   = serializers.DecimalField(max_digits=10, decimal_places=2)
-
-
-class OrderCreateSerializer(serializers.Serializer):
-    customer_name    = serializers.CharField(max_length=200)
-    customer_phone   = serializers.CharField(max_length=20)
-    delivery_address = serializers.CharField()
-    payment_method   = serializers.ChoiceField(choices=['mpesa', 'airtel', 'card'], default='mpesa')
-    items            = OrderItemInputSerializer(many=True)
-
-    def validate_items(self, value):
-        if not value:
-            raise serializers.ValidationError("Cart is empty.")
-        return value
-
-    def validate_customer_phone(self, value):
-        digits = value.strip().replace(' ', '').replace('-', '').replace('+', '')
-        if not digits.isdigit():
-            raise serializers.ValidationError("Phone number must contain only digits.")
-        if len(digits) < 9 or len(digits) > 13:
-            raise serializers.ValidationError("Enter a valid Kenyan phone number.")
-        return value
-
-
 class OrderItemSerializer(serializers.ModelSerializer):
     subtotal = serializers.SerializerMethodField()
 

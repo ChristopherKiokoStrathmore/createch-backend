@@ -6,8 +6,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
-from .models import Order, OrderItem
-from .serializers import OrderCreateSerializer, OrderSerializer
+from .models import Order
+from .serializers import OrderSerializer
 from .dpo import verify_token, DPOError, RESULT_NOT_PAID_YET
 
 logger = logging.getLogger(__name__)
@@ -19,14 +19,6 @@ def _is_uuid(value: str) -> bool:
         return True
     except (ValueError, AttributeError, TypeError):
         return False
-
-
-def normalize_phone(raw: str) -> str:
-    """Convert 07XXXXXXXX / +2547XXXXXXXX / 2547XXXXXXXX to 2547XXXXXXXX."""
-    phone = raw.strip().replace(' ', '').replace('-', '').lstrip('+')
-    if phone.startswith('0'):
-        phone = '254' + phone[1:]
-    return phone
 
 
 class OrderView(APIView):
@@ -59,36 +51,6 @@ class OrderView(APIView):
             'count':   paginator.count,
             'results': OrderSerializer(page.object_list, many=True).data,
         })
-
-    def post(self, request):
-        serializer = OrderCreateSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        data       = serializer.validated_data
-        items_data = data.pop('items')
-        total      = sum(i['quantity'] * i['unit_price'] for i in items_data)
-        phone      = normalize_phone(data['customer_phone'])
-
-        payment_method = data.get('payment_method', Order.MPESA)
-
-        order = Order.objects.create(
-            customer_name    = data['customer_name'],
-            customer_phone   = phone,
-            delivery_address = data['delivery_address'],
-            total_amount     = total,
-            payment_method   = payment_method,
-        )
-        for item in items_data:
-            OrderItem.objects.create(order=order, **item)
-
-        # Payments are handled entirely by WooCommerce (Daraja STK push for
-        # M-Pesa, DPO Pay for cards); this backend only records the order.
-        return Response({
-            "order_id": str(order.id),
-            "message":  "Order recorded.",
-        }, status=status.HTTP_201_CREATED)
-
 
 class OrderDetailView(APIView):
     def get(self, request, order_id):
