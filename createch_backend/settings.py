@@ -23,7 +23,9 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
+    'storages',
     'orders',
+    'arch_media',
 ]
 
 MIDDLEWARE = [
@@ -78,15 +80,62 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Media: metadata in Postgres, file BYTES on disk (Railway volume) or S3/R2.
+# Never store image blobs in BYTEA.
+MEDIA_URL = config('MEDIA_URL', default='/media/')
+MEDIA_ROOT = Path(config('MEDIA_ROOT', default=str(BASE_DIR / 'media')))
+# Django's static() helper only serves in DEBUG. Set SERVE_MEDIA=True on Railway
+# when a volume is mounted at MEDIA_ROOT and you are not using S3/R2.
+SERVE_MEDIA = config('SERVE_MEDIA', default=DEBUG, cast=bool)
+
+AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME', default='')
+USE_S3_MEDIA = bool(AWS_STORAGE_BUCKET_NAME)
+
+if USE_S3_MEDIA:
+    AWS_ACCESS_KEY_ID = config('AWS_ACCESS_KEY_ID', default='')
+    AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY', default='')
+    AWS_S3_REGION_NAME = config('AWS_S3_REGION_NAME', default='auto')
+    AWS_S3_ENDPOINT_URL = config('AWS_S3_ENDPOINT_URL', default='') or None
+    AWS_S3_CUSTOM_DOMAIN = config('AWS_S3_CUSTOM_DOMAIN', default='') or None
+    AWS_S3_SIGNATURE_VERSION = config('AWS_S3_SIGNATURE_VERSION', default='s3v4')
+    AWS_S3_ADDRESSING_STYLE = config('AWS_S3_ADDRESSING_STYLE', default='virtual')
+    AWS_DEFAULT_ACL = None
+    AWS_QUERYSTRING_AUTH = config('AWS_QUERYSTRING_AUTH', default=False, cast=bool)
+    AWS_S3_FILE_OVERWRITE = False
+    AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'public, max-age=86400'}
+    DEFAULT_FILE_STORAGE_BACKEND = 'storages.backends.s3.S3Storage'
+else:
+    DEFAULT_FILE_STORAGE_BACKEND = 'django.core.files.storage.FileSystemStorage'
+
+STORAGES = {
+    'default': {'BACKEND': DEFAULT_FILE_STORAGE_BACKEND},
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# CORS
-CORS_ALLOWED_ORIGINS = config(
-    'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:3000'
-).split(',')
+# CORS — comma-separated, no trailing slashes. Arch Vercel + createch.co.ke
+# plus existing Hobbies origins. Override per environment via CORS_ALLOWED_ORIGINS.
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in config(
+        'CORS_ALLOWED_ORIGINS',
+        default=(
+            'http://localhost:3000,'
+            'http://localhost:5173,'
+            'http://127.0.0.1:3000,'
+            'http://127.0.0.1:5173,'
+            'https://createch.co.ke,'
+            'https://www.createch.co.ke,'
+            'https://createatechhobbies1.vercel.app,'
+            'https://createchhobbies.vercel.app'
+        ),
+    ).split(',')
+    if origin.strip()
+]
 CORS_ALLOW_HEADERS = [
     'accept', 'accept-encoding', 'authorization', 'content-type',
     'dnt', 'origin', 'user-agent', 'x-csrftoken', 'x-requested-with',
@@ -96,13 +145,27 @@ CORS_ALLOW_HEADERS = [
 # DRF
 REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': ['rest_framework.renderers.JSONRenderer'],
-    'DEFAULT_PARSER_CLASSES': ['rest_framework.parsers.JSONParser'],
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.MultiPartParser',
+        'rest_framework.parsers.FormParser',
+    ],
 }
 
 # Admin order API key (legacy — kept for backwards compat)
 ADMIN_API_KEY = config('ADMIN_API_KEY', default='')
 # Admin dashboard secret key — used by X-Admin-Key header on GET /api/orders/
 ADMIN_SECRET_KEY = config('ADMIN_SECRET_KEY', default='')
+# Arch image library / chrome writes. X-Admin-Key may match this OR ADMIN_SECRET_KEY.
+ARCH_ADMIN_SECRET = config('ARCH_ADMIN_SECRET', default='')
+ARCH_MAX_UPLOAD_BYTES = config('ARCH_MAX_UPLOAD_BYTES', default=12 * 1024 * 1024, cast=int)
+ARCH_ALLOWED_CONTENT_TYPES = [
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'image/svg+xml',
+]
 
 # WooCommerce webhook secret — must match the Secret field on the Woo webhook
 # (WP admin → WooCommerce → Settings → Advanced → Webhooks)
